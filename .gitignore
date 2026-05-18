@@ -1,0 +1,48 @@
+# =========================
+# General OS & IDE Files
+# =========================
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+*.iws
+.vscode/
+*.log
+
+# =========================
+# Backend (Java / Maven / Spring Boot)
+# =========================
+backend/target/
+backend/bin/
+backend/.settings/
+backend/.classpath
+backend/.project
+*.jar
+*.war
+*.ear
+
+# =========================
+# Frontend (Angular / Node)
+# =========================
+frontend/node_modules/
+frontend/dist/
+frontend/out/
+frontend/.angular/
+frontend/coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# =========================
+# Mobile (Android / Gradle)
+# =========================
+mobile/.gradle/
+mobile/build/
+mobile/app/build/
+mobile/local.properties
+mobile/.cxx/
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
