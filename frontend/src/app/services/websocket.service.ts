@@ -1,4 +1,5 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 
 export interface EventSignal {
   id: number;
@@ -24,6 +25,9 @@ export interface CrisisAlert {
 })
 export class WebsocketService {
   
+  private http = inject(HttpClient);
+  private backendUrl = 'http://localhost:8080/api/simulation';
+
   public signals = signal<EventSignal[]>([]);
   public alerts = signal<CrisisAlert[]>([]);
   public agentTraces = signal<string[]>([]);
@@ -32,16 +36,90 @@ export class WebsocketService {
   constructor() {
     this.addTrace('> [System] AegisNet Standalone Demo Mode Initialized.');
     this.addTrace('> [System] Gemini Orchestration Engine: ONLINE');
+    this.addTrace('> [System] Open-Meteo & GDELT Live Feeds: READY');
   }
 
   private addTrace(msg: string) {
     this.agentTraces.update(traces => [msg, ...traces].slice(0, 50));
   }
 
-  // --- MOCK SIMULATION FOR STANDALONE DEMO ---
+  // ==============================
+  //  LIVE DATA INJECTION (REAL APIs)
+  // ==============================
+
+  /** Calls backend -> Open-Meteo API to inject REAL weather data for Murree */
+  public injectLiveWeather() {
+    this.addTrace('> [System] LIVE DATA: Requesting real-time weather from Open-Meteo API...');
+    
+    this.http.post<any>(`${this.backendUrl}/live-weather`, {}).subscribe({
+      next: (res) => {
+        const sig = res.signal;
+        if (sig) {
+          const parsed = JSON.parse(sig.rawPayload);
+          this.signals.update(sigs => [{
+            id: sig.id,
+            source: 'OPEN_METEO_LIVE',
+            type: 'WEATHER_TELEMETRY',
+            rawPayload: `LIVE: ${parsed.temp_c}°C | Rain: ${parsed.precipitation_mm}mm | Wind: ${parsed.wind_kmh}km/h | Humidity: ${parsed.humidity_pct}%`,
+            severityScore: sig.severityScore,
+            confidence: 1.0,
+            timestamp: new Date().toISOString()
+          }, ...sigs]);
+
+          this.addTrace(`> [Agent_1: Intake] LIVE Open-Meteo data received: Temp=${parsed.temp_c}°C, Precip=${parsed.precipitation_mm}mm`);
+          this.addTrace(`> [Agent_1: Intake] Elevation: ${parsed.elevation_m}m | Severity Score: ${sig.severityScore}/100`);
+          this.addTrace('> [Agent_1: Intake] Trusted Machine Source: Confidence 1.0');
+        }
+        this.checkCorrelation();
+      },
+      error: (err) => {
+        this.addTrace(`> [System] ERROR: Failed to fetch live weather: ${err.message}`);
+      }
+    });
+  }
+
+  /** Calls backend -> GDELT API to inject REAL crisis news signals for Pakistan */
+  public injectLiveGdelt() {
+    this.addTrace('> [System] LIVE DATA: Querying GDELT Project for Pakistan crisis news...');
+    
+    this.http.post<any>(`${this.backendUrl}/live-gdelt`, {}).subscribe({
+      next: (res) => {
+        const signals = res.signals || [];
+        if (signals.length === 0) {
+          this.addTrace('> [Agent_3: Correlation] GDELT returned 0 crisis articles for Pakistan in last 24h.');
+          return;
+        }
+
+        for (const sig of signals) {
+          const parsed = JSON.parse(sig.rawPayload);
+          this.signals.update(sigs => [{
+            id: sig.id,
+            source: 'GDELT_NEWS',
+            type: 'CRISIS_NEWS_SIGNAL',
+            rawPayload: `"${parsed.title}" — ${parsed.domain}`,
+            severityScore: sig.severityScore,
+            confidence: sig.confidence,
+            timestamp: new Date().toISOString()
+          }, ...sigs]);
+
+          this.addTrace(`> [Agent_3: Correlation] GDELT: "${parsed.title.substring(0, 60)}..."`);
+        }
+
+        this.addTrace(`> [Agent_3: Correlation] ${signals.length} live crisis signals ingested from GDELT.`);
+        this.checkCorrelation();
+      },
+      error: (err) => {
+        this.addTrace(`> [System] ERROR: Failed to fetch GDELT data: ${err.message}`);
+      }
+    });
+  }
+
+  // ==============================
+  //  MOCK SIMULATION (for demo)
+  // ==============================
 
   public simulateWeather() {
-    this.addTrace('> [System] Triggered: Weather Anomaly Injection');
+    this.addTrace('> [System] Triggered: Weather Anomaly Injection (MOCK)');
     
     setTimeout(() => {
       this.addTrace('> [Agent_1: Signal Intake] Processing new signal from SUPARCO_WEATHER...');
@@ -63,7 +141,7 @@ export class WebsocketService {
   }
 
   public simulateSocial() {
-    this.addTrace('> [System] Triggered: Social Panic Injection');
+    this.addTrace('> [System] Triggered: Social Panic Injection (MOCK)');
     
     setTimeout(() => {
       this.addTrace('> [Agent_1: Signal Intake] Processing new signal from SOCIAL_X...');
@@ -92,12 +170,12 @@ export class WebsocketService {
 
   private checkCorrelation() {
     const currentSignals = this.signals();
-    const hasWeather = currentSignals.some(s => s.source === 'SUPARCO_WEATHER');
-    const hasSocial = currentSignals.some(s => s.source === 'SOCIAL_X');
+    const hasWeather = currentSignals.some(s => s.source === 'SUPARCO_WEATHER' || s.source === 'OPEN_METEO_LIVE');
+    const hasSocial = currentSignals.some(s => s.source === 'SOCIAL_X' || s.source === 'GDELT_NEWS');
 
     if (hasWeather && hasSocial && this.alerts().length === 0) {
       setTimeout(() => {
-        this.addTrace('> [Agent_3: Crisis Correlation] CLUSTER DETECTED: Weather Anomaly intersects with Verified Social Panic in Grid [33.90, 73.39]');
+        this.addTrace('> [Agent_3: Crisis Correlation] CLUSTER DETECTED: Weather Anomaly intersects with Verified Social/News Signal in Grid [33.90, 73.39]');
         this.addTrace('> [Agent_4: Predictive Escalation] Running historical impact simulations...');
         
         setTimeout(() => {
