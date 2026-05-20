@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -20,8 +22,16 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
 
-        // Gemini API Key from local.properties
-        val geminiKey: String = project.findProperty("GEMINI_API_KEY") as? String ?: ""
+        // Gemini API Key from local.properties (if exists) or gradle.properties
+        val localProperties = Properties()
+        val localPropsFile = rootProject.file("local.properties")
+        if (localPropsFile.exists()) {
+            localPropsFile.inputStream().use { localProperties.load(it) }
+        }
+        val geminiKey: String = localProperties.getProperty("GEMINI_API_KEY") 
+            ?: project.findProperty("GEMINI_API_KEY") as? String 
+            ?: ""
+            
         buildConfigField("String", "GEMINI_API_KEY", "\"$geminiKey\"")
     }
 
