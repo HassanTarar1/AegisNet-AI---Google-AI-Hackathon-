@@ -23,6 +23,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aegisnet.mobile.ui.dashboard.DashboardViewModel
 import com.aegisnet.mobile.domain.agent.EocAgentOrchestrator
+import com.aegisnet.mobile.domain.agent.GeminiAgentService
 import com.aegisnet.mobile.ui.alerts.AlertDetailScreen
 import com.aegisnet.mobile.ui.dashboard.DashboardScreen
 import com.aegisnet.mobile.ui.dashboard.components.AgentOperationsHubScreen
@@ -51,7 +52,7 @@ sealed class Screen(val route: String, val title: String, val icon: androidx.com
 
 @Composable
 fun AegisNavGraph(
-    orchestrator: EocAgentOrchestrator = EocAgentOrchestrator()
+    orchestrator: EocAgentOrchestrator = EocAgentOrchestrator(GeminiAgentService())
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()

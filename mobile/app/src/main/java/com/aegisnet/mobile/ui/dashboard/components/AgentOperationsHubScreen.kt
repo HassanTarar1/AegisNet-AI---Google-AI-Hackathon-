@@ -58,16 +58,28 @@ fun AgentOperationsHubScreen(
             Spacer(modifier = Modifier.width(12.dp))
             Column {
                 Text(
-                    "EOC COOPERATIVE AGENTS",
+                    "GEMINI AI AGENT NETWORK",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
-                Text(
-                    "Mesh node active • 4 Agents executing offline rules",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF00E676)
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(if (orchestrator.isAiOnline) Color(0xFF00E676) else Color(0xFFFF9800))
+                    )
+                    Text(
+                        if (orchestrator.isAiOnline) "Gemini 2.0 Flash Online • 5 AI Agents Active"
+                        else "Offline Mode • Using rule-based fallback agents",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (orchestrator.isAiOnline) Color(0xFF00E676) else Color(0xFFFF9800)
+                    )
+                }
             }
         }
 

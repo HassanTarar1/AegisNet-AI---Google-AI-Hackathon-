@@ -515,12 +515,62 @@ fun ResourceAllocationScreen(
                                         verticalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         Text(
-                                            "NIGEHBAN SMART DISPATCH DIRECTIVE",
+                                            "GEMINI AI RESOURCE ADVISOR",
                                             color = AegisPrimary,
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold,
                                             letterSpacing = 0.5.sp
                                         )
+
+                                        // Real-time Gemini AI Resource Recommendation
+                                        val geminiAgent = remember { com.aegisnet.mobile.domain.agent.GeminiAgentService() }
+                                        var aiRecommendation by remember { mutableStateOf<com.aegisnet.mobile.domain.agent.GeminiAgentService.ResourceRecommendation?>(null) }
+                                        var isAiThinking by remember { mutableStateOf(false) }
+
+                                        LaunchedEffect(alert.id, isBoardExpanded) {
+                                            if (isBoardExpanded && aiRecommendation == null) {
+                                                isAiThinking = true
+                                                val depotsList = sortedDepots.map { "${it.first.name} (${it.first.capacity - it.first.currentResources}/${it.first.capacity} available)" }
+                                                aiRecommendation = geminiAgent.recommendResourceAllocation(
+                                                    crisisType = alert.title,
+                                                    severity = alert.severity,
+                                                    location = alert.zone,
+                                                    availableDepots = depotsList
+                                                )
+                                                isAiThinking = false
+                                            }
+                                        }
+
+                                        if (isAiThinking) {
+                                            Row(
+                                                modifier = Modifier.padding(vertical = 6.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                CircularProgressIndicator(color = AegisPrimary, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
+                                                Text("AI analyzing optimal dispatch strategy...", color = Color.Gray, fontSize = 10.sp)
+                                            }
+                                        }
+
+                                        aiRecommendation?.let { rec ->
+                                            Surface(
+                                                color = AegisPrimary.copy(alpha = 0.08f),
+                                                shape = RoundedCornerShape(8.dp),
+                                                border = BorderStroke(1.dp, AegisPrimary.copy(alpha = 0.3f)),
+                                                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                                            ) {
+                                                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = AegisPrimary, modifier = Modifier.size(12.dp))
+                                                        Text("AI RECOMMENDED STRATEGY", color = AegisPrimary, fontWeight = FontWeight.Bold, fontSize = 9.sp)
+                                                    }
+                                                    Text(rec.strategy, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                                    Text("Units: ${rec.recommendedUnits}", color = Color.LightGray, fontSize = 10.sp)
+                                                    Divider(color = AegisPrimary.copy(alpha = 0.2f), modifier = Modifier.padding(vertical = 2.dp))
+                                                    Text("Reasoning: ${rec.reasoning}", color = Color.Gray, fontSize = 9.sp, lineHeight = 12.sp)
+                                                }
+                                            }
+                                        }
 
                                         // Sorting nearest stations
                                         sortedDepots.forEachIndexed { index, (depot, distance) ->

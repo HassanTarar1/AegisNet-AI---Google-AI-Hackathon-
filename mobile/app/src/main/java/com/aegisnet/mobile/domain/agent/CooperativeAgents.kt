@@ -1,9 +1,13 @@
 package com.aegisnet.mobile.domain.agent
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -35,45 +39,52 @@ data class SocialTweet(
     val timeAgo: String,
     val sentiment: String, // "PANIC", "NEUTRAL", "SAFE"
     val correlatedCrisis: String? = null,
-    val correlationReason: String? = null
+    val correlationReason: String? = null,
+    val aiCredibilityScore: Double? = null,
+    val aiVerdict: String? = null
 )
 
 @Singleton
-class EocAgentOrchestrator @Inject constructor() {
+class EocAgentOrchestrator @Inject constructor(
+    private val geminiAgent: GeminiAgentService
+) {
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    val isAiOnline: Boolean get() = geminiAgent.isAvailable
 
     private val _agents = MutableStateFlow<Map<AgentRole, EocAgent>>(
         mapOf(
             AgentRole.SOCIAL_SIGNAL to EocAgent(
                 role = AgentRole.SOCIAL_SIGNAL,
-                name = "SocialSignal-Agent (X-Scraper)",
-                description = "Scrapes simulated social panic signals and public sentiment telemetry.",
+                name = "Gemini Social Verifier Agent",
+                description = "AI-powered social signal credibility analysis using Gemini 2.0 Flash.",
                 avatarEmoji = "🤖",
-                status = "OFFLINE_ACTIVE",
-                logs = listOf("System initialised.", "Ready to scrape emergency triggers.")
+                status = "IDLE",
+                logs = listOf("Gemini AI Agent initialized.", "Ready to verify social signals with LLM reasoning.")
             ),
             AgentRole.RESCUE_DISPATCH to EocAgent(
                 role = AgentRole.RESCUE_DISPATCH,
-                name = "RescueDispatch-Agent",
-                description = "Sweeps nearest GCP emergency departments & coordinates local offline alerts.",
-                avatarEmoji = "🚑",
-                status = "OFFLINE_ACTIVE",
-                logs = listOf("Responder database loaded locally.", "Awaiting EOC trigger.")
+                name = "Gemini Crisis Analyzer Agent",
+                description = "Analyzes crisis reports and recommends severity, actions, and affected estimates.",
+                avatarEmoji = "🧠",
+                status = "IDLE",
+                logs = listOf("Crisis Analyzer online.", "Awaiting incident reports for AI triage.")
             ),
             AgentRole.PERIMETER_GEOMETRY to EocAgent(
                 role = AgentRole.PERIMETER_GEOMETRY,
-                name = "Perimeter-Geometry Agent",
-                description = "Calculates bounding perimeters, flood/snow lines, and path containment.",
-                avatarEmoji = "📐",
-                status = "OFFLINE_ACTIVE",
-                logs = listOf("Evacuation path coordinates compiled.", "Perimeter logic online.")
+                name = "Gemini Escalation Predictor",
+                description = "Predicts crisis escalation using correlated multi-signal analysis.",
+                avatarEmoji = "⚡",
+                status = "IDLE",
+                logs = listOf("Escalation model loaded.", "Monitoring for multi-signal correlation patterns.")
             ),
             AgentRole.MESH_BROADCAST to EocAgent(
                 role = AgentRole.MESH_BROADCAST,
-                name = "MeshBroadcasting-Agent",
-                description = "Encapsulates encrypted emergency metadata packets over raw Bluetooth/RF MESH.",
-                avatarEmoji = "📡",
+                name = "Gemini NLP Translator Agent",
+                description = "Real-time Urdu/Pashto/English translation and incident classification.",
+                avatarEmoji = "🌐",
                 status = "IDLE",
-                logs = listOf("Offline mesh transceiver bound.", "Beacon ready.")
+                logs = listOf("Multilingual NLP agent ready.", "Supports English, Urdu, Pashto crisis transcription.")
             )
         )
     )
@@ -88,55 +99,75 @@ class EocAgentOrchestrator @Inject constructor() {
     )
     val tweets: StateFlow<List<SocialTweet>> = _tweets.asStateFlow()
 
+    // ── AI Analysis results exposed as state ──
+    private val _latestCrisisAnalysis = MutableStateFlow<GeminiAgentService.CrisisAnalysis?>(null)
+    val latestCrisisAnalysis: StateFlow<GeminiAgentService.CrisisAnalysis?> = _latestCrisisAnalysis.asStateFlow()
+
+    private val _latestEscalation = MutableStateFlow<GeminiAgentService.EscalationPrediction?>(null)
+    val latestEscalation: StateFlow<GeminiAgentService.EscalationPrediction?> = _latestEscalation.asStateFlow()
+
+    private val _latestTranslation = MutableStateFlow<GeminiAgentService.TranslationResult?>(null)
+    val latestTranslation: StateFlow<GeminiAgentService.TranslationResult?> = _latestTranslation.asStateFlow()
+
+    private val _latestResourceAdvice = MutableStateFlow<GeminiAgentService.ResourceRecommendation?>(null)
+    val latestResourceAdvice: StateFlow<GeminiAgentService.ResourceRecommendation?> = _latestResourceAdvice.asStateFlow()
+
+    private val _isAgentProcessing = MutableStateFlow(false)
+    val isAgentProcessing: StateFlow<Boolean> = _isAgentProcessing.asStateFlow()
+
+    /**
+     * Trigger real Gemini AI social signal verification.
+     */
     fun triggerSocialAnalysis(anomalyType: String, areaName: String) {
         val timestamp = getFormattedTime()
-        val generatedTweet = when (anomalyType) {
-            "FLOOD", "FLOOD_WATER" -> SocialTweet(
-                username = "@ResiliencePindi",
-                handle = "res_pindi",
-                body = "Emergency alert: Heavy torrential rain in $areaName causes flash flooding. Local agents advising immediate evacuation! #SaveAegisNet",
-                timeAgo = "Just now",
-                sentiment = "PANIC",
-                correlatedCrisis = "Emergency: $anomalyType",
-                correlationReason = "Matches flood incident sector $areaName within 1.5km."
-            )
-            "SEISMIC_ACTIVITY" -> SocialTweet(
-                username = "@SeismicPulsePK",
-                handle = "seismic_pk",
-                body = "Did anyone feel that tremor in $areaName? Everything was shaking for 15 seconds! Hope everyone is safe. #EarthquakePK",
-                timeAgo = "Just now",
-                sentiment = "PANIC",
-                correlatedCrisis = "Emergency: $anomalyType",
-                correlationReason = "Sensor match: tremor reports match epicenter geodetics within 2.0km."
-            )
-            else -> SocialTweet(
-                username = "@SnowPatrolPK",
-                handle = "snow_pk",
-                body = "Stuck in heavy blizzard near $areaName! Temperature freezing. Can offline maps show evacuation points? #CrisisHelp",
-                timeAgo = "Just now",
-                sentiment = "PANIC",
-                correlatedCrisis = "Emergency: $anomalyType",
-                correlationReason = "Matches snowstorm incident sector $areaName within 0.8km."
-            )
-        }
+
+        val generatedTweet = SocialTweet(
+            username = if (anomalyType.contains("FLOOD")) "@ResiliencePindi" else "@SeismicPulsePK",
+            handle = if (anomalyType.contains("FLOOD")) "res_pindi" else "seismic_pk",
+            body = "Emergency alert in $areaName: $anomalyType situation developing rapidly. Stay safe! #CrisisPK",
+            timeAgo = "Just now",
+            sentiment = "PANIC",
+            correlatedCrisis = "Emergency: $anomalyType",
+            correlationReason = "Matches $anomalyType incident sector $areaName."
+        )
 
         _tweets.update { listOf(generatedTweet) + it }
 
-        _agents.update { currentMap ->
-            val agent = currentMap[AgentRole.SOCIAL_SIGNAL]!!
-            val newLogs = listOf(
-                "[$timestamp] parsed panic signal from ${generatedTweet.handle}",
-                "[$timestamp] Sentiment: ${generatedTweet.sentiment} detected.",
-                "[$timestamp] Pushed alert payload to EOC mesh router."
-            ) + agent.logs
-            currentMap + (AgentRole.SOCIAL_SIGNAL to agent.copy(
-                status = "ANALYZING",
-                processedCount = agent.processedCount + 1,
-                logs = newLogs.take(20)
-            ))
+        // Launch real Gemini verification
+        scope.launch {
+            updateAgentStatus(AgentRole.SOCIAL_SIGNAL, "ANALYZING")
+            addAgentLog(AgentRole.SOCIAL_SIGNAL, "[$timestamp] 🧠 Gemini AI: Verifying social signal credibility...")
+
+            val verification = geminiAgent.verifySocialSignal(
+                tweetText = generatedTweet.body,
+                handle = generatedTweet.handle,
+                location = areaName
+            )
+
+            // Update the tweet with AI verification results
+            _tweets.update { currentTweets ->
+                currentTweets.map { tweet ->
+                    if (tweet == generatedTweet) {
+                        tweet.copy(
+                            aiCredibilityScore = verification.credibilityScore,
+                            aiVerdict = verification.verdict,
+                            correlationReason = "🤖 AI: ${verification.reasoning}"
+                        )
+                    } else tweet
+                }
+            }
+
+            addAgentLog(AgentRole.SOCIAL_SIGNAL,
+                "[$timestamp] ✅ AI Verdict: ${verification.verdict} (${String.format("%.0f", verification.credibilityScore * 100)}% credible)")
+            addAgentLog(AgentRole.SOCIAL_SIGNAL,
+                "[$timestamp] 💬 AI Reasoning: ${verification.reasoning}")
+            updateAgentStatus(AgentRole.SOCIAL_SIGNAL, "IDLE", incrementCount = true)
         }
     }
 
+    /**
+     * Trigger real Gemini AI crisis analysis on rescue dispatch.
+     */
     fun triggerRescueDispatch(
         latitude: Double,
         longitude: Double,
@@ -145,55 +176,121 @@ class EocAgentOrchestrator @Inject constructor() {
         nearbyPolice: List<String> = emptyList()
     ) {
         val timestamp = getFormattedTime()
-        val nearestHospital = nearbyHospitals.firstOrNull() ?: (if (latitude > 33.6) "Holy Family Hospital (Rawalpindi)" else "Murree General Emergency Wing")
-        val nearestRescueStation = nearbyPolice.firstOrNull() ?: (if (latitude > 33.6) "Rescue 1122 Headquarter, Rawalpindi" else "Ghora Gali First Responders")
 
-        _agents.update { currentMap ->
-            val agent = currentMap[AgentRole.RESCUE_DISPATCH]!!
-            val newLogs = listOf(
-                "[$timestamp] Ingested alert coordinate request [${"%.4f".format(latitude)}, ${"%.4f".format(longitude)}]",
-                "[$timestamp] Sweep complete: identified nearest hospital [$nearestHospital] & nearest responder [$nearestRescueStation].",
-                "[$timestamp] Actioned dispatch notification queue: active responders routed to $incidentName.",
-                "[$timestamp] EOC dispatch sync completed successfully."
-            ) + agent.logs
-            currentMap + (AgentRole.RESCUE_DISPATCH to agent.copy(
-                status = "DISPATCHING",
-                processedCount = agent.processedCount + 1,
-                logs = newLogs.take(20)
-            ))
+        scope.launch {
+            _isAgentProcessing.value = true
+            updateAgentStatus(AgentRole.RESCUE_DISPATCH, "ANALYZING")
+            addAgentLog(AgentRole.RESCUE_DISPATCH,
+                "[$timestamp] 🧠 Gemini AI: Analyzing crisis at [${"%.4f".format(latitude)}, ${"%.4f".format(longitude)}]...")
+
+            val analysis = geminiAgent.analyzeCrisisReport(
+                description = "$incidentName at coordinates $latitude, $longitude. Nearby hospitals: ${nearbyHospitals.joinToString()}. Police: ${nearbyPolice.joinToString()}.",
+                location = "${"%.4f".format(latitude)}°N, ${"%.4f".format(longitude)}°E",
+                type = incidentName
+            )
+
+            _latestCrisisAnalysis.value = analysis
+
+            addAgentLog(AgentRole.RESCUE_DISPATCH,
+                "[$timestamp] ✅ AI Severity: ${analysis.severity} (${analysis.confidenceScore}% confidence)")
+            addAgentLog(AgentRole.RESCUE_DISPATCH,
+                "[$timestamp] 📊 AI Summary: ${analysis.summary}")
+            addAgentLog(AgentRole.RESCUE_DISPATCH,
+                "[$timestamp] 🎯 AI Actions: ${analysis.recommendedActions.joinToString(" | ")}")
+            addAgentLog(AgentRole.RESCUE_DISPATCH,
+                "[$timestamp] 👥 Estimated Affected: ${analysis.estimatedAffected}")
+
+            updateAgentStatus(AgentRole.RESCUE_DISPATCH, "DISPATCHING", incrementCount = true)
+            _isAgentProcessing.value = false
         }
     }
 
+    /**
+     * Trigger real Gemini AI escalation prediction.
+     */
     fun triggerPerimeterGeometry(latitude: Double, longitude: Double) {
         val timestamp = getFormattedTime()
+
+        scope.launch {
+            updateAgentStatus(AgentRole.PERIMETER_GEOMETRY, "ANALYZING")
+            addAgentLog(AgentRole.PERIMETER_GEOMETRY,
+                "[$timestamp] 🧠 Gemini AI: Running escalation prediction model...")
+
+            val prediction = geminiAgent.predictEscalation(
+                activeAlertsSummary = "Active crisis at ${"%.4f".format(latitude)}°N, ${"%.4f".format(longitude)}°E",
+                recentSignalsSummary = "Multiple social panic signals, weather anomaly detected in area."
+            )
+
+            _latestEscalation.value = prediction
+
+            val escIcon = if (prediction.willEscalate) "🔴" else "🟢"
+            addAgentLog(AgentRole.PERIMETER_GEOMETRY,
+                "[$timestamp] $escIcon Escalation: ${if (prediction.willEscalate) "YES" else "NO"} (${prediction.escalationProbability}% probability)")
+            addAgentLog(AgentRole.PERIMETER_GEOMETRY,
+                "[$timestamp] 📈 Scenario: ${prediction.predictedScenario}")
+            addAgentLog(AgentRole.PERIMETER_GEOMETRY,
+                "[$timestamp] 🛡️ Preventive: ${prediction.preventiveActions.joinToString(" | ")}")
+
+            updateAgentStatus(AgentRole.PERIMETER_GEOMETRY, "IDLE", incrementCount = true)
+        }
+    }
+
+    /**
+     * Trigger real Gemini AI NLP translation and classification.
+     */
+    fun triggerMeshBroadcast(incidentType: String, severity: String) {
+        val timestamp = getFormattedTime()
+
+        scope.launch {
+            updateAgentStatus(AgentRole.MESH_BROADCAST, "ANALYZING")
+            addAgentLog(AgentRole.MESH_BROADCAST,
+                "[$timestamp] 🧠 Gemini AI: Translating and classifying verbal report...")
+
+            val translation = geminiAgent.translateAndClassify(incidentType)
+            _latestTranslation.value = translation
+
+            addAgentLog(AgentRole.MESH_BROADCAST,
+                "[$timestamp] 🌐 Language: ${translation.detectedLanguage}")
+            addAgentLog(AgentRole.MESH_BROADCAST,
+                "[$timestamp] 🇬🇧 English: ${translation.englishTranslation}")
+            addAgentLog(AgentRole.MESH_BROADCAST,
+                "[$timestamp] 🇵🇰 Urdu: ${translation.urduTranslation}")
+            addAgentLog(AgentRole.MESH_BROADCAST,
+                "[$timestamp] 📋 Type: ${translation.classifiedType} | Urgency: ${translation.urgencyLevel}")
+
+            updateAgentStatus(AgentRole.MESH_BROADCAST, "IDLE", incrementCount = true)
+        }
+    }
+
+    /**
+     * Trigger Gemini AI resource allocation recommendation.
+     */
+    fun triggerResourceAdvice(crisisType: String, severity: String, location: String, depots: List<String>) {
+        scope.launch {
+            _isAgentProcessing.value = true
+            val recommendation = geminiAgent.recommendResourceAllocation(crisisType, severity, location, depots)
+            _latestResourceAdvice.value = recommendation
+            _isAgentProcessing.value = false
+        }
+    }
+
+    // ── Helper functions ──
+
+    private fun updateAgentStatus(role: AgentRole, status: String, incrementCount: Boolean = false) {
         _agents.update { currentMap ->
-            val agent = currentMap[AgentRole.PERIMETER_GEOMETRY]!!
-            val newLogs = listOf(
-                "[$timestamp] Computed evacuation polygon center: [${"%.4f".format(latitude)}, ${"%.4f".format(longitude)}].",
-                "[$timestamp] Defined 1.5km geofenced containment vector polygon.",
-                "[$timestamp] Transmitted perimeter coordinates boundary to local Radar sweep graphics."
-            ) + agent.logs
-            currentMap + (AgentRole.PERIMETER_GEOMETRY to agent.copy(
-                status = "OFFLINE_ACTIVE",
-                processedCount = agent.processedCount + 1,
-                logs = newLogs.take(20)
+            val agent = currentMap[role] ?: return@update currentMap
+            currentMap + (role to agent.copy(
+                status = status,
+                processedCount = if (incrementCount) agent.processedCount + 1 else agent.processedCount
             ))
         }
     }
 
-    fun triggerMeshBroadcast(incidentType: String, severity: String) {
-        val timestamp = getFormattedTime()
+    private fun addAgentLog(role: AgentRole, log: String) {
         _agents.update { currentMap ->
-            val agent = currentMap[AgentRole.MESH_BROADCAST]!!
-            val newLogs = listOf(
-                "[$timestamp] Serialized emergency payload: Type=$incidentType, Severity=$severity",
-                "[$timestamp] Encapsulated payload into compressed 18-byte mesh beacon.",
-                "[$timestamp] Offline Mesh Broadcast completed over Bluetooth Low Energy mesh channels ✓"
-            ) + agent.logs
-            currentMap + (AgentRole.MESH_BROADCAST to agent.copy(
-                status = "OFFLINE_ACTIVE",
-                processedCount = agent.processedCount + 1,
-                logs = newLogs.take(20)
+            val agent = currentMap[role] ?: return@update currentMap
+            currentMap + (role to agent.copy(
+                logs = (listOf(log) + agent.logs).take(25)
             ))
         }
     }

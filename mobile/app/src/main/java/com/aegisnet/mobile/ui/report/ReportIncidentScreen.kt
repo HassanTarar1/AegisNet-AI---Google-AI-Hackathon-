@@ -583,26 +583,50 @@ fun ReportIncidentScreen(
                     }
                 }
 
-                // Real-time NLP Translation Classifier Card
-                val translationData = remember(uiState.description) {
-                    val desc = uiState.description.lowercase(Locale.getDefault())
-                    when {
-                        desc.contains("zalzala") || desc.contains("زلزلہ") || desc.contains("earthquake") || desc.contains("tremor") -> {
-                            Triple("Urdu (زلزلہ)", "Seismic Activity (Earthquake / Tremors)", "SEISMIC_ACTIVITY")
+                // Real-time Gemini AI Translation & Classification
+                val geminiAgent = remember { com.aegisnet.mobile.domain.agent.GeminiAgentService() }
+                var aiTranslation by remember { mutableStateOf<com.aegisnet.mobile.domain.agent.GeminiAgentService.TranslationResult?>(null) }
+                var isTranslating by remember { mutableStateOf(false) }
+
+                // Trigger Gemini translation when description changes (debounced)
+                LaunchedEffect(uiState.description) {
+                    if (uiState.description.length >= 3) {
+                        isTranslating = true
+                        delay(800) // Debounce
+                        aiTranslation = geminiAgent.translateAndClassify(uiState.description)
+                        isTranslating = false
+                    } else {
+                        aiTranslation = null
+                    }
+                }
+
+                val translationData = aiTranslation?.let {
+                    Triple(it.detectedLanguage, it.englishTranslation, it.classifiedType)
+                }
+
+                // Gemini AI processing indicator
+                if (isTranslating) {
+                    Surface(
+                        color = AegisPrimary.copy(alpha = 0.08f),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, AegisPrimary.copy(alpha = 0.3f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                color = AegisPrimary,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Column {
+                                Text("GEMINI AI ANALYZING...", color = AegisPrimary, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Text("Translating, classifying, and extracting entities from speech", color = Color.LightGray, fontSize = 9.sp)
+                            }
                         }
-                        desc.contains("selab") || desc.contains("silab") || desc.contains("سیلاب") || desc.contains("flood") -> {
-                            Triple("Urdu/Pashto (سیلاب)", "Flood Water Emergency (Flooding/Canal Overflow)", "FLOOD_WATER")
-                        }
-                        desc.contains("jalsa") || desc.contains("جلسہ") || desc.contains("rally") || desc.contains("dharna") || desc.contains("protest") -> {
-                            Triple("Urdu (جلسہ)", "Political Rally / Mass Public Gathering", "POLITICAL_RALLY")
-                        }
-                        desc.contains("accident") || desc.contains("shara jam") || desc.contains("sharah jam") || desc.contains("traffic block") || desc.contains("jam") -> {
-                            Triple("Urdu (ٹریفک جام)", "Traffic Blockage / Major Road Collision", "TRAFFIC_BLOCKAGE")
-                        }
-                        desc.contains("sarak taba") || desc.contains("sarak tabahi") || desc.contains("road collapse") || desc.contains("sinkhole") || desc.contains("khada") -> {
-                            Triple("Urdu/Pashto", "Road Collapse & Infrastructure Washout", "ROAD_COLLAPSE")
-                        }
-                        else -> null
                     }
                 }
 
@@ -622,7 +646,7 @@ fun ReportIncidentScreen(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Icon(Icons.Default.Translate, contentDescription = null, tint = AegisSuccess, modifier = Modifier.size(16.dp))
-                                Text("NIGEHBAN AI TRANSLATION DETECTED", color = AegisSuccess, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Text("GEMINI AI TRANSLATION ✓", color = AegisSuccess, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                             }
                             
                             Divider(color = AegisSuccess.copy(alpha = 0.2f))
