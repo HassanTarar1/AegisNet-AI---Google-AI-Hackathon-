@@ -285,9 +285,17 @@
             </div>
 
             <!-- Source -->
-            <div class="text-[8px] font-mono text-slate-600 flex justify-between pt-1 border-t border-slate-800">
-              <span>SRC: {{ event.source }}</span>
-              <span>CONF: {{ event.confidence | number:'1.2-2' }}</span>
+            <div class="text-[8px] font-mono flex justify-between items-end pt-2 mt-2 border-t border-slate-800">
+              <div class="flex flex-col gap-0.5">
+                <span class="text-slate-400">SRC: {{ event.source }}</span>
+                <span class="text-slate-600">CONF: {{ event.confidence | number:'1.2-2' }}</span>
+              </div>
+              @if (event.referenceLink) {
+                <a [href]="event.referenceLink" target="_blank" class="px-2 py-1 bg-[#0a1929] hover:bg-[#0f2942] text-cyan-400 border border-cyan-900/50 rounded transition-colors flex items-center gap-1">
+                  VERIFY SOURCE
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                </a>
+              }
             </div>
           </div>
         </div>

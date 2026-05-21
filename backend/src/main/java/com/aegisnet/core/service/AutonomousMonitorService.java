@@ -33,6 +33,9 @@ public class AutonomousMonitorService {
     private final GdacsService           gdacsService;
     private final BlueskyService         blueskyService;
     private final MastodonService        mastodonService;
+    private final HdxService             hdxService;
+    private final FirmsService           firmsService;
+    private final PmdAlertService        pmdService;
     private final CrisisIntelligenceAgent crisisAgent;
     private final SimpMessagingTemplate  messagingTemplate;
 
@@ -52,8 +55,8 @@ public class AutonomousMonitorService {
             cityThreats.put(c.name, new CityThreatLevel(c.name, c.lat, c.lng, c.risk));
 
         pushTrace("[System] Nigehban AI Crisis Intelligence System — ONLINE");
-        pushTrace("[System] Sources: Open-Meteo | GDELT | GDACS | Bluesky | Mastodon");
-        pushTrace("[System] Polling: Weather 30s | News 90s | Social 60s | GDACS 5min");
+        pushTrace("[System] Sources: Meteo | GDELT | GDACS | Bluesky | Mastodon | HDX | FIRMS | PMD");
+        pushTrace("[System] Polling: Weather 30s | Social 60s | News 90s | Advanced 120s | GDACS 5m");
         log.info("=== Nigehban AI Autonomous Monitor: READY ===");
     }
 
@@ -126,6 +129,26 @@ public class AutonomousMonitorService {
         mastodonResult.getTraceMessages().forEach(m -> pushTrace("[Agent_4: Social] [MAST] " + m));
         
         broadcastAll(crisisAgent.getActiveEvents(), ts, "Social");
+    }
+
+    // ─── AGENT 5: ADVANCED INTEL (HDX, FIRMS, PMD) ────────────────────────────
+    @Scheduled(fixedDelay = 120_000, initialDelay = 20_000)
+    public void advancedIntelCycle() {
+        String ts = ts();
+        pushTrace(String.format("[%s] [Agent_5: Intel] Polling HDX, NASA FIRMS, and PMD Alerts...", ts));
+
+        var hdxResult = hdxService.fetchHdxSignals();
+        var firmsResult = firmsService.fetchFirmsSignals();
+        var pmdResult = pmdService.fetchPmdAlerts();
+
+        crisisAgent.injectSocialSignals(hdxResult, firmsResult); // Reusing social injector for generic string matching
+        crisisAgent.injectSocialSignals(pmdResult, new com.aegisnet.core.service.SocialSignalResult("stub"));
+
+        hdxResult.getTraceMessages().forEach(m -> pushTrace("[Agent_5: Intel] [HDX] " + m));
+        firmsResult.getTraceMessages().forEach(m -> pushTrace("[Agent_5: Intel] [FIRMS] " + m));
+        pmdResult.getTraceMessages().forEach(m -> pushTrace("[Agent_5: Intel] [PMD] " + m));
+        
+        broadcastAll(crisisAgent.getActiveEvents(), ts, "AdvancedIntel");
     }
 
     // ─── AGENT 6: GDACS EU REAL-TIME DISASTERS  ───────────────────────────────

@@ -48,6 +48,7 @@ export interface CrisisEvent {
   evacuationStatus: string;
   recommendedActions: string;
   source: string;
+  referenceLink?: string;
   confidence: number;
   detectedAt: string;
   lastUpdated: string;

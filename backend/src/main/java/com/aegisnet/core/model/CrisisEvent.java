@@ -38,6 +38,7 @@ public class CrisisEvent {
 
     // Intelligence source
     private String source;       // WEATHER_API, GDELT_NEWS, SOCIAL_TREND, HISTORICAL_PATTERN
+    private String referenceLink;
     private double confidence;
     private LocalDateTime detectedAt;
     private LocalDateTime lastUpdated;
@@ -104,6 +105,9 @@ public class CrisisEvent {
 
     public String getSource() { return source; }
     public void setSource(String source) { this.source = source; }
+
+    public String getReferenceLink() { return referenceLink; }
+    public void setReferenceLink(String referenceLink) { this.referenceLink = referenceLink; }
 
     public double getConfidence() { return confidence; }
     public void setConfidence(double confidence) { this.confidence = confidence; }
