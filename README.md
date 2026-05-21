@@ -10,17 +10,55 @@
 
 **AegisNet AI** is an enterprise-grade, multi-agent artificial intelligence ecosystem designed to predict, validate, monitor, and coordinate disaster responses *before* catastrophic escalation occurs. 
 
-Moving beyond traditional reactive emergency systems, AegisNet proactively ingests multi-source environmental and social data to intercept mass-casualty events using a swarm of autonomous AI agents powered by **Google Gemini 3.1 Pro**.
+Moving beyond traditional reactive emergency systems, AegisNet proactively ingests multi-source environmental and social data to intercept mass-casualty events using a swarm of autonomous AI agents powered by **Google Gemini 2.0 Flash**.
 
 ## 🧠 The Multi-Agent Ecosystem
 
 AegisNet operates using a sophisticated pipeline of AI agents that communicate autonomously via event streams:
 
-1. **Intake Agent:** Normalizes raw, noisy multi-lingual signals from hardware sensors, government APIs (e.g., SUPARCO), and citizen reports.
+```mermaid
+graph TD
+    %% Inputs
+    C_Rep[Citizen Voice/Text Reports] --> A1
+    S_Sig[Social Media Panic Signals] --> A2
+    Env[Sensor & Weather Data] --> A3
+    
+    %% Agents
+    subgraph MobileAI["On-Device Mobile AI (Gemini 2.0 Flash)"]
+        A1[Multilingual NLP Agent]
+        A2[Social Verification Agent]
+        A3[Crisis Correlation Agent]
+        A1 --> |Translated & Classified Incident| A4
+        A2 --> |Credibility Score: 0.0 - 1.0| A4
+        A3 --> |Risk Clusters| A4
+        A4{Predictive Escalation Agent}
+    end
+    
+    %% Outputs & Command Center
+    A4 -->|Critical Alert Trigger| EOC[EOC Tactical Command Center]
+    
+    subgraph ResponseOrchestration["Response Orchestration"]
+        EOC --> R1[Resource Allocation Advisor]
+        R1 -->|Optimized Dispatch Strategy| Teams[Rescue Teams & Medics]
+        EOC --> R2[Drone Coordination Agent]
+        R2 -->|Thermal Scanning Routes| Drones[UAV Swarms]
+    end
+    
+    %% Styling
+    classDef ai fill:#0b5345,stroke:#2ecc71,stroke-width:2px,color:#fff;
+    classDef input fill:#1c2833,stroke:#5dade2,stroke-width:1px,color:#fff;
+    classDef output fill:#78281f,stroke:#e74c3c,stroke-width:2px,color:#fff;
+    
+    class A1,A2,A3,A4,R1,R2 ai;
+    class C_Rep,S_Sig,Env input;
+    class EOC,Teams,Drones output;
+```
+
+1. **Multilingual NLP Agent:** Normalizes raw, noisy multi-lingual signals (Urdu/Pashto/English) from hardware sensors and citizen reports into structured data.
 2. **Social Verification Agent (Crisis Credibility Engine):** Analyzes social media panic signals for authenticity, filtering out spam and misinformation to output a mathematical credibility score.
 3. **Crisis Correlation Agent:** Detects overlapping risk clusters (e.g., severe weather + traffic gridlock).
 4. **Predictive Escalation Agent (The Core Brain):** Evaluates clustered events against historical models to predict casualty risks and generate preventive action mandates.
-5. **Drone Coordination Agent:** Simulates the dispatch and routing of autonomous drone swarms for thermal scanning of affected zones.
+5. **Resource & Drone Coordination Agents:** Simulates the dispatch of autonomous drone swarms for thermal scanning and optimally allocates ground rescue teams.
 
 ## ❄️ Core Demo Scenario: Murree Snowstorm Prevention
 Our hackathon demonstration revolves around preventing the tragic Murree snowstorm entrapment scenario.
@@ -35,7 +73,7 @@ The system simultaneously ingests a severe weather anomaly (heavy snowfall) and 
 
 AegisNet is a modular, event-driven microservices platform built for enterprise scalability:
 
-- **AI Orchestration:** Google Vertex AI (Gemini 3.1 Pro), Spring AI
+- **AI Orchestration:** Google Generative AI SDK (Gemini 2.0 Flash), Spring AI
 - **Backend (The Core):** Java 21, Spring Boot, WebSockets (STOMP)
 - **Data Layer:** PostgreSQL (PostGIS for Spatial queries), Redis, Docker
 - **Command Center (Frontend):** Angular 18, TailwindCSS (Military-grade Dark Mode), RxStomp
