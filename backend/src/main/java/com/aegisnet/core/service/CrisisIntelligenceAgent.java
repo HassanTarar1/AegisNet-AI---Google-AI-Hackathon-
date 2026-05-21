@@ -75,18 +75,37 @@ public class CrisisIntelligenceAgent {
         double precip = city.getPrecipitationMm();
         double wind = city.getWindSpeedKmh();
         int humidity = city.getHumidityPct();
+        int aqi = city.getUsAqi();
+        double flood = city.getRiverDischargeM3s();
         MonitoredZone zone = ZONE_MAP.get(city.getCityName());
         if (zone == null) return;
 
-        // FLOOD: rain > 5mm (lower threshold — 5mm is already significant)
-        if (precip >= 5.0) {
-            int sev = precip >= 50 ? 90 : precip >= 30 ? 75 : precip >= 15 ? 55 : precip >= 10 ? 40 : 28;
+        // URBAN FLOODING: rain > 5mm OR RIVER FLOOD: discharge > 1000 m3/s
+        if (precip >= 5.0 || flood >= 1000) {
+            int sev = (int) Math.max(
+                precip >= 50 ? 90 : precip >= 30 ? 75 : precip >= 15 ? 55 : precip >= 10 ? 40 : precip >= 5 ? 28 : 0,
+                flood >= 10000 ? 95 : flood >= 5000 ? 80 : flood >= 2000 ? 60 : flood >= 1000 ? 45 : 0
+            );
             if (humidity > 75) sev = Math.min(sev + 8, 100);
+            
+            String msg = precip >= 15.0 ? String.format("⚡ LIVE: Heavy Rainfall — %.1f mm/hr", precip) 
+                                        : String.format("🌊 LIVE: Elevated River Flow — %.0f m³/s", flood);
+            
             upsertEvent("WX-FLOOD-" + zone.name, "FLOOD", zone, sev,
-                String.format("⚡ LIVE: Heavy Rainfall — %.1f mm/hr in %s", precip, city.getCityName()),
-                String.format("Open-Meteo real-time: %.1fmm precipitation at %s | Temp: %.1f°C | Humidity: %d%% | Wind: %.0fkm/h. Flood risk elevated.",
-                    precip, city.getCityName(), temp, humidity, wind),
-                "OPEN-METEO (Live Weather)", 0.95, now);
+                msg + " in " + city.getCityName(),
+                String.format("Open-Meteo real-time: %.1fmm precipitation | River Discharge: %.0fm³/s at %s. Flood risk elevated.",
+                    precip, flood, city.getCityName()),
+                "OPEN-METEO (Live Sensor Fusion)", 0.95, now);
+        }
+
+        // SEVERE SMOG / AIR POLLUTION: AQI > 150
+        if (aqi >= 150) {
+            int sev = aqi >= 300 ? 95 : aqi >= 200 ? 75 : aqi >= 150 ? 55 : 30;
+            upsertEvent("WX-SMOG-" + zone.name, "DROUGHT", zone, sev, // Map Smog to Drought/AirQuality icon if we don't have SMOG
+                String.format("🌫️ LIVE: Hazardous Air Quality — %d AQI in %s", aqi, city.getCityName()),
+                String.format("Open-Meteo real-time: US AQI is %d (PM2.5: %.1f µg/m³) at %s. Respiratory hazard. Schools and outdoor labor advisory.",
+                    aqi, city.getPm25(), city.getCityName()),
+                "OPEN-METEO (Live Air Quality)", 0.98, now);
         }
 
         // EXTREME HEAT: > 42°C
@@ -132,7 +151,7 @@ public class CrisisIntelligenceAgent {
         for (String cityName : cities) {
             int severity = gdeltResult.getSeverityForCity(cityName);
             int articles = gdeltResult.getArticleCountForCity(cityName);
-            if (severity < 30 || articles < 2) continue; // Require at least 2 articles
+            if (severity < 30 || articles < 2) continue;
 
             MonitoredZone zone = ZONE_MAP.get(cityName);
             if (zone == null) continue;
@@ -143,10 +162,42 @@ public class CrisisIntelligenceAgent {
                     articles, cityName, severity),
                 "GDELT News Intelligence (Live)", 0.72, now);
         }
-        // Expire old news events
         activeEvents.entrySet().removeIf(e ->
             e.getValue().getSource().contains("GDELT") &&
             e.getValue().getLastUpdated().isBefore(now.minusHours(2)));
+    }
+
+    // =================== SOURCE 4: SOCIAL MEDIA SIGNALS ===================
+    public void injectSocialSignals(SocialSignalResult bsky, SocialSignalResult mast) {
+        LocalDateTime now = LocalDateTime.now();
+        String[] cities = {"Karachi", "Lahore", "Islamabad", "Peshawar", "Quetta"};
+
+        for (String cityName : cities) {
+            int bskySev = bsky != null ? bsky.getSeverityForCity(cityName) : 0;
+            int mastSev = mast != null ? mast.getSeverityForCity(cityName) : 0;
+            
+            int combinedSev = Math.max(bskySev, mastSev);
+            if (combinedSev < 40) continue;
+
+            MonitoredZone zone = ZONE_MAP.get(cityName);
+            if (zone == null) continue;
+
+            // Map keywords to specific national threat types
+            String type = "RIOT";
+            if (combinedSev > 80) type = "TERRORISM";
+            else if (combinedSev == 45) type = "MCI";
+            else if (combinedSev == 15) type = "GRID_COLLAPSE";
+
+            upsertEvent("SOCIAL-" + cityName, type, zone, combinedSev,
+                String.format("📱 DECENTRALIZED SOCIAL ALERT: %s in %s", type.replace("_", " "), cityName),
+                String.format("High-velocity crisis keywords detected on public timelines. Bluesky Severity: %d | Mastodon Severity: %d",
+                    bskySev, mastSev),
+                "Bluesky & Mastodon (Live Social Intelligence)", 0.85, now);
+        }
+
+        activeEvents.entrySet().removeIf(e ->
+            e.getValue().getSource().contains("Social") &&
+            e.getValue().getLastUpdated().isBefore(now.minusHours(1)));
     }
 
     // =================== SOURCE 3: GDACS (EU Joint Research Centre) ===================
@@ -259,8 +310,13 @@ public class CrisisIntelligenceAgent {
             case "HEATWAVE"    -> "Heat relief camps, water tankers, mobile medical units";
             case "SNOWSTORM"   -> "Snow plows, rescue teams, Pakistan Army, thermal shelters";
             case "CYCLONE"     -> "Pakistan Navy, coastal guard, NDMA disaster teams";
-            case "EARTHQUAKE"  -> "Urban Search & Rescue, field hospitals, structural engineers";
+            case "EARTHQUAKE", "LANDSLIDE"  -> "Urban Search & Rescue, field hospitals, structural engineers, heavy machinery";
             case "DROUGHT"     -> "Water tankers, WFP, food distribution teams";
+            case "RIOT", "CROWD_CRUSH" -> "Riot police, Rangers, tear gas units, mobile medical triage";
+            case "TERRORISM", "MCI" -> "CTD (Counter Terrorism Dept), Bomb Disposal Squad, ambulances, blood banks";
+            case "GRID_COLLAPSE" -> "WAPDA emergency crews, standby generators for hospitals";
+            case "PANDEMIC", "EPIDEMIC" -> "NIH response teams, quarantine units, bio-hazard suits, vaccines";
+            case "CBRN", "HAZMAT" -> "Military CBRN units, hazmat suits, decontamination tents";
             default            -> "Emergency response teams on standby";
         };
     }
@@ -278,8 +334,13 @@ public class CrisisIntelligenceAgent {
             case "HEATWAVE"   -> "1. Open cooling centres\n2. Deploy water distribution\n3. Ban outdoor labour 11am–4pm\n4. Hospital heatstroke preparedness\n5. Priority power to hospitals";
             case "SNOWSTORM"  -> "1. Close mountain roads\n2. Deploy snow-clearing equipment\n3. Activate thermal shelters\n4. Helicopter rescue standby\n5. Tourist advisory";
             case "CYCLONE"    -> "1. Fishermen return advisory\n2. Coastal evacuation prep\n3. Navy standby\n4. Secure port infrastructure\n5. Emergency broadcast";
-            case "EARTHQUAKE" -> "1. Structural damage assessment\n2. Deploy search & rescue\n3. Field hospital setup\n4. Aftershock monitoring\n5. Debris clearance";
+            case "EARTHQUAKE", "LANDSLIDE" -> "1. Structural damage assessment\n2. Deploy search & rescue\n3. Field hospital setup\n4. Aftershock monitoring\n5. Debris clearance";
             case "DROUGHT"    -> "1. Deploy water tankers\n2. Food distribution\n3. Livestock support\n4. Water rationing plan";
+            case "RIOT"       -> "1. Establish police cordons\n2. Protect critical infrastructure\n3. Issue curfew advisory\n4. Monitor social media for escalation";
+            case "TERRORISM"  -> "1. Immediate area lockdown\n2. Dispatch CTD\n3. Secure hospitals\n4. Suspend mobile networks in sector";
+            case "CROWD_CRUSH" -> "1. Divert incoming traffic\n2. Create emergency access lanes\n3. Deploy mass triage units";
+            case "GRID_COLLAPSE" -> "1. Secure hospitals on backup\n2. Dispatch WAPDA crews\n3. Traffic police to major intersections";
+            case "PANDEMIC", "EPIDEMIC" -> "1. Isolate cases\n2. Dispatch epidemiological tracking\n3. Secure medical supply chains";
             default           -> "1. Assess situation\n2. Deploy response team\n3. Monitor escalation\n4. Brief authorities";
         };
     }

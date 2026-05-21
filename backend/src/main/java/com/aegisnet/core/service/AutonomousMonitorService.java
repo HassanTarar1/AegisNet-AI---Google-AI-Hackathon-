@@ -31,6 +31,8 @@ public class AutonomousMonitorService {
     private final OpenMeteoService       openMeteoService;
     private final GdeltService           gdeltService;
     private final GdacsService           gdacsService;
+    private final BlueskyService         blueskyService;
+    private final MastodonService        mastodonService;
     private final CrisisIntelligenceAgent crisisAgent;
     private final SimpMessagingTemplate  messagingTemplate;
 
@@ -50,8 +52,8 @@ public class AutonomousMonitorService {
             cityThreats.put(c.name, new CityThreatLevel(c.name, c.lat, c.lng, c.risk));
 
         pushTrace("[System] Nigehban AI Crisis Intelligence System — ONLINE");
-        pushTrace("[System] Sources: Open-Meteo | GDELT | GDACS (EU Joint Research Centre)");
-        pushTrace("[System] Polling: Weather 30s | News 90s | GDACS Disasters 5min");
+        pushTrace("[System] Sources: Open-Meteo | GDELT | GDACS | Bluesky | Mastodon");
+        pushTrace("[System] Polling: Weather 30s | News 90s | Social 60s | GDACS 5min");
         log.info("=== Nigehban AI Autonomous Monitor: READY ===");
     }
 
@@ -62,19 +64,21 @@ public class AutonomousMonitorService {
         pushTrace(String.format("[%s] [Agent_1: Weather] Fetching live data — 5 cities…", ts));
 
         for (CityDef c : CITIES) {
-            openMeteoService.fetchWeatherForCity(cityThreats.get(c.name));
+            openMeteoService.fetchEnvironmentalDataForCity(cityThreats.get(c.name));
             try { Thread.sleep(150); } catch (InterruptedException ignored) {}
         }
 
-        // Log any notable readings
         for (CityDef c : CITIES) {
             CityThreatLevel ct = cityThreats.get(c.name);
             double p = ct.getPrecipitationMm();
             double t = ct.getTemperatureC();
             double w = ct.getWindSpeedKmh();
-            if (p > 0 || t >= 42 || t <= 1 || w >= 40) {
-                pushTrace(String.format("[Agent_1] %s: %.1f°C | %.1fmm rain | %.0fkm/h wind",
-                    c.name, t, p, w));
+            int aqi = ct.getUsAqi();
+            double flood = ct.getRiverDischargeM3s();
+            
+            if (p > 0 || t >= 42 || t <= 1 || w >= 40 || aqi >= 150 || flood >= 1000) {
+                pushTrace(String.format("[Agent_1: Environ] %s: %.1f°C | %.1fmm | %d AQI | %.0fm³/s flow",
+                    c.name, t, p, aqi, flood));
             }
         }
 
@@ -107,8 +111,25 @@ public class AutonomousMonitorService {
         broadcastAll(crisisAgent.getActiveEvents(), ts, "GDELT");
     }
 
+    // ─── AGENT 4: DECENTRALIZED SOCIAL SIGNALS ────────────────────────────────
+    @Scheduled(fixedDelay = 60_000, initialDelay = 15_000)
+    public void socialSignalsCycle() {
+        String ts = ts();
+        pushTrace(String.format("[%s] [Agent_4: Social] Polling Bluesky and Mastodon...", ts));
+
+        var bskyResult = blueskyService.fetchBlueskySignals();
+        var mastodonResult = mastodonService.fetchMastodonSignals();
+
+        crisisAgent.injectSocialSignals(bskyResult, mastodonResult);
+
+        bskyResult.getTraceMessages().forEach(m -> pushTrace("[Agent_4: Social] [BSKY] " + m));
+        mastodonResult.getTraceMessages().forEach(m -> pushTrace("[Agent_4: Social] [MAST] " + m));
+        
+        broadcastAll(crisisAgent.getActiveEvents(), ts, "Social");
+    }
+
     // ─── AGENT 6: GDACS EU REAL-TIME DISASTERS  ───────────────────────────────
-    @Scheduled(fixedDelay = 300_000, initialDelay = 5_000)   // every 5 minutes
+    @Scheduled(fixedDelay = 300_000, initialDelay = 5_000)
     public void gdacsCycle() {
         String ts = ts();
         pushTrace(String.format("[%s] [Agent_6: GDACS] Scanning EU disaster feed (Pakistan region)…", ts));
@@ -128,7 +149,6 @@ public class AutonomousMonitorService {
 
     // ─── HELPERS  ─────────────────────────────────────────────────────────────
     private void broadcastAll(List<CrisisEvent> events, String ts, String agent) {
-        // City threats
         List<CityThreatLevel> threats = new ArrayList<>();
         for (CityDef c : CITIES) {
             cityThreats.get(c.name).computeThreatLevel();

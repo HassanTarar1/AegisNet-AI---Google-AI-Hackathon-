@@ -136,6 +136,46 @@
       <div class="absolute top-3 left-3 z-20 text-[9px] font-mono text-green-400/80 bg-black/70 px-2 py-1 rounded border border-slate-800 pointer-events-none">
         LAT {{ mouseCoords.lat }} | LNG {{ mouseCoords.lng }} | Z{{ mapZoom }}
       </div>
+
+      <!-- Environmental Telemetry HUD -->
+      <div class="absolute bottom-4 left-4 right-4 z-20 flex gap-3 overflow-x-auto pointer-events-auto pb-2 custom-scrollbar">
+        @for (city of wsService.cityThreats(); track city.cityName) {
+          <div class="bg-black/80 backdrop-blur border border-slate-700/50 rounded-lg p-2.5 min-w-[200px] shrink-0 hover:bg-[#111] transition-colors border-t-2"
+               [style.border-top-color]="city.overallThreatLevel > 80 ? '#ef4444' : city.overallThreatLevel > 50 ? '#f97316' : '#3b82f6'">
+            <div class="flex justify-between items-center mb-2 border-b border-slate-800 pb-1.5">
+              <span class="font-bold text-white text-[11px] uppercase tracking-wider">{{ city.cityName }}</span>
+              <span class="text-[8px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-slate-700">
+                THREAT: {{ city.overallThreatLevel }}
+              </span>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[9px] font-mono">
+              <div class="flex flex-col">
+                <span class="text-slate-500 mb-0.5">AIR QUALITY</span>
+                <div class="flex items-center gap-1.5">
+                  <div class="w-1.5 h-1.5 rounded-full" [ngClass]="city.usAqi > 150 ? 'bg-orange-500 animate-pulse' : 'bg-green-500'"></div>
+                  <span [ngClass]="city.usAqi > 150 ? 'text-orange-400 font-bold' : 'text-slate-300'">{{ city.usAqi || 0 }} AQI</span>
+                </div>
+              </div>
+              <div class="flex flex-col">
+                <span class="text-slate-500 mb-0.5">PM 2.5</span>
+                <span class="text-slate-300">{{ city.pm25 || 0 }} µg/m³</span>
+              </div>
+              <div class="flex flex-col">
+                <span class="text-slate-500 mb-0.5">RIVER FLOW</span>
+                <div class="flex items-center gap-1.5">
+                  <div class="w-1.5 h-1.5 rounded-full" [ngClass]="city.riverDischargeM3s > 1000 ? 'bg-blue-500 animate-pulse' : 'bg-slate-500'"></div>
+                  <span [ngClass]="city.riverDischargeM3s > 1000 ? 'text-blue-400 font-bold' : 'text-slate-300'">{{ city.riverDischargeM3s || 0 }} m³/s</span>
+                </div>
+              </div>
+              <div class="flex flex-col">
+                <span class="text-slate-500 mb-0.5">WEATHER</span>
+                <span class="text-slate-300">{{ city.temperatureC || 0 }}°C | {{ city.precipitationMm || 0 }}mm</span>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
     </section>
 
     <!-- ====== RIGHT PANEL: Stats + Detail ====== -->

@@ -23,7 +23,15 @@ public class CityThreatLevel {
     // Severity scores
     private int weatherSeverity;    // 0-100
     private int newsSeverity;       // 0-100
+    private int aqiSeverity;        // 0-100
+    private int floodSeverity;      // 0-100
     private int overallThreatLevel; // 0-100
+
+    // Additional Environmental Data
+    private int usAqi;
+    private double pm25;
+    private double pm10;
+    private double riverDischargeM3s;
 
     // Classification
     private String threatCategory; // NOMINAL, ADVISORY, ELEVATED, HIGH, CRITICAL
@@ -48,11 +56,12 @@ public class CityThreatLevel {
     }
 
     /**
-     * Computes the overall threat level and category from weather + news severity.
+     * Computes the overall threat level and category from multi-source severity.
      */
     public void computeThreatLevel() {
-        // Weather has 70% weight, news has 30% weight
-        this.overallThreatLevel = (int) (weatherSeverity * 0.7 + newsSeverity * 0.3);
+        // Advanced Weighted Correlation
+        // Weather 40%, News 20%, AQI 20%, Flood 20%
+        this.overallThreatLevel = (int) (weatherSeverity * 0.4 + newsSeverity * 0.2 + aqiSeverity * 0.2 + floodSeverity * 0.2);
         this.overallThreatLevel = Math.min(overallThreatLevel, 100);
 
         if (overallThreatLevel >= 81) this.threatCategory = "CRITICAL";
@@ -63,6 +72,26 @@ public class CityThreatLevel {
 
         this.lastUpdated = LocalDateTime.now();
     }
+
+    // --- Getters and Setters ---
+    
+    public int getUsAqi() { return usAqi; }
+    public void setUsAqi(int usAqi) { this.usAqi = usAqi; }
+    
+    public double getPm25() { return pm25; }
+    public void setPm25(double pm25) { this.pm25 = pm25; }
+    
+    public double getPm10() { return pm10; }
+    public void setPm10(double pm10) { this.pm10 = pm10; }
+    
+    public double getRiverDischargeM3s() { return riverDischargeM3s; }
+    public void setRiverDischargeM3s(double riverDischargeM3s) { this.riverDischargeM3s = riverDischargeM3s; }
+    
+    public int getAqiSeverity() { return aqiSeverity; }
+    public void setAqiSeverity(int aqiSeverity) { this.aqiSeverity = aqiSeverity; }
+    
+    public int getFloodSeverity() { return floodSeverity; }
+    public void setFloodSeverity(int floodSeverity) { this.floodSeverity = floodSeverity; }
 
     // --- Getters and Setters ---
 

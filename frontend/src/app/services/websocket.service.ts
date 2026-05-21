@@ -14,10 +14,16 @@ export interface CityThreat {
   weatherSummary: string;
   weatherSeverity: number;
   newsSeverity: number;
+  aqiSeverity: number;
+  floodSeverity: number;
   overallThreatLevel: number;
   threatCategory: string;
   riskProfile: string;
   activeNewsSignals: number;
+  usAqi: number;
+  pm25: number;
+  pm10: number;
+  riverDischargeM3s: number;
   lastUpdated: string;
 }
 
@@ -197,13 +203,34 @@ export class WebsocketService {
 
   getTypeIcon(type: string): string {
     switch (type) {
-      case 'FLOOD': return '🌊';
-      case 'EARTHQUAKE': return '🔴';
+      // Geological
+      case 'EARTHQUAKE': return '💥';
       case 'LANDSLIDE': return '⛰️';
+      case 'AVALANCHE': return '🏔️';
+      case 'VOLCANO': return '🌋';
+      // Hydrological
+      case 'FLOOD': return '🌊';
       case 'SNOWSTORM': return '❄️';
       case 'HEATWAVE': return '🔥';
       case 'CYCLONE': return '🌀';
       case 'DROUGHT': return '☀️';
+      case 'WILDFIRE': return '🌲';
+      // Public Safety
+      case 'RIOT': return '🛡️';
+      case 'CROWD_CRUSH': return '👥';
+      case 'MCI': return '🚑';
+      // National Security
+      case 'TERRORISM': return '⚔️';
+      case 'CBRN': return '☢️';
+      case 'CYBERATTACK': return '💻';
+      // Infrastructure
+      case 'GRID_COLLAPSE': return '⚡';
+      case 'DAM_FAILURE': return '🏗️';
+      case 'HAZMAT': return '🛢️';
+      // Biological
+      case 'PANDEMIC': return '☣️';
+      case 'EPIDEMIC': return '🦠';
+      
       default: return '⚠️';
     }
   }
