@@ -364,5 +364,16 @@ public class CrisisIntelligenceAgent {
         };
     }
 
+    public void submitCitizenReport(String type, String title, String description, String severity, int affectedCount, double lat, double lng) {
+        LocalDateTime now = LocalDateTime.now();
+        MonitoredZone zone = findNearestZone(lat, lng);
+        int sevScore = "CRITICAL".equalsIgnoreCase(severity) ? 85 : "HIGH".equalsIgnoreCase(severity) ? 65 : "MEDIUM".equalsIgnoreCase(severity) ? 45 : 25;
+        
+        upsertEvent("CITIZEN-" + System.currentTimeMillis(), type, zone, sevScore,
+            "📱 CITIZEN REPORT: " + title,
+            description,
+            "Direct Citizen Submission", "https://nigehban.ai/reports", sevScore / 100.0, now);
+    }
+
     private record MonitoredZone(String name, double lat, double lng, String region, int population) {}
 }

@@ -20,6 +20,22 @@ export class App implements AfterViewInit, OnDestroy {
   public mapZoom = 5;
   public currentTime = '';
 
+  // Mobile-synced Tab Navigation
+  public currentTab: 'hud' | 'resources' | 'report' = 'hud';
+
+  // Citizen Reporting Form State
+  public reportForm = {
+    type: '',
+    title: '',
+    description: '',
+    severity: 'HIGH',
+    affectedCount: 100,
+    latitude: 30.3753,
+    longitude: 69.3451
+  };
+  public reportSubmitting = false;
+  public reportSuccess = false;
+
   constructor() {
     // Update clock
     setInterval(() => {
@@ -161,5 +177,53 @@ export class App implements AfterViewInit, OnDestroy {
     if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
     if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
     return n.toString();
+  }
+
+  // Submit citizen report to backend REST endpoint
+  public async submitReport() {
+    if (!this.reportForm.type || !this.reportForm.title || !this.reportForm.description) {
+      alert('Please fill out all required fields.');
+      return;
+    }
+    this.reportSubmitting = true;
+    try {
+      const res = await fetch('http://localhost:8080/api/simulation/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(this.reportForm)
+      });
+      if (res.ok) {
+        this.reportSuccess = true;
+        setTimeout(() => {
+          this.reportSuccess = false;
+          this.currentTab = 'hud';
+          this.reportForm = {
+            type: '',
+            title: '',
+            description: '',
+            severity: 'HIGH',
+            affectedCount: 100,
+            latitude: 30.3753,
+            longitude: 69.3451
+          };
+        }, 2000);
+      } else {
+        alert('EOC Brain rejected report format.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Failed to connect to EOC Network.');
+    } finally {
+      this.reportSubmitting = false;
+    }
+  }
+
+  // Copy coordinate values from current leaflet map center
+  public useMapCenterCoords() {
+    if (this.map) {
+      const center = this.map.getCenter();
+      this.reportForm.latitude = Number(center.lat.toFixed(4));
+      this.reportForm.longitude = Number(center.lng.toFixed(4));
+    }
   }
 }
