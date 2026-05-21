@@ -24,7 +24,7 @@ graph TD
     Env[Sensor & Weather Data] --> A3
     
     %% Agents
-    subgraph On-Device Mobile AI (Gemini 2.0 Flash)
+    subgraph MobileAI["On-Device Mobile AI (Gemini 2.0 Flash)"]
         A1[Multilingual NLP Agent]
         A2[Social Verification Agent]
         A3[Crisis Correlation Agent]
@@ -37,7 +37,7 @@ graph TD
     %% Outputs & Command Center
     A4 -->|Critical Alert Trigger| EOC[EOC Tactical Command Center]
     
-    subgraph Response Orchestration
+    subgraph ResponseOrchestration["Response Orchestration"]
         EOC --> R1[Resource Allocation Advisor]
         R1 -->|Optimized Dispatch Strategy| Teams[Rescue Teams & Medics]
         EOC --> R2[Drone Coordination Agent]
