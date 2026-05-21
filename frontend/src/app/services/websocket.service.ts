@@ -69,7 +69,7 @@ export class WebsocketService {
   }
 
   private connectWebSocket() {
-    this.addTrace('> [System] Connecting to AegisNet backend...');
+    this.addTrace('> [System] Connecting to Nigehban AI backend...');
 
     this.stompClient = new Client({
       webSocketFactory: () => new SockJS('http://localhost:8080/ws-aegisnet'),

@@ -49,10 +49,10 @@ public class AutonomousMonitorService {
         for (CityDef c : CITIES)
             cityThreats.put(c.name, new CityThreatLevel(c.name, c.lat, c.lng, c.risk));
 
-        pushTrace("[System] AegisNet Crisis Intelligence — ONLINE");
+        pushTrace("[System] Nigehban AI Crisis Intelligence System — ONLINE");
         pushTrace("[System] Sources: Open-Meteo | GDELT | GDACS (EU Joint Research Centre)");
         pushTrace("[System] Polling: Weather 30s | News 90s | GDACS Disasters 5min");
-        log.info("=== AegisNet Autonomous Monitor: READY ===");
+        log.info("=== Nigehban AI Autonomous Monitor: READY ===");
     }
 
     // ─── AGENT 1: WEATHER  ────────────────────────────────────────────────────
