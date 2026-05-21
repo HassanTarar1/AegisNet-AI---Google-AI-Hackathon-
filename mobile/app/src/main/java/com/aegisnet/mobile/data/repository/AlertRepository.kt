@@ -23,7 +23,7 @@ class AlertRepository @Inject constructor(
     private val incidentDao: IncidentDao
 ) {
     // API Key from AndroidManifest
-    private val mapApiKey = "AIzaSyB6SeusDrKCWC_PbbLnnq4Nu-teH4ioAZk"
+    private val mapApiKey = "MAPAPIKEY"
 
     // Mock initial alerts for demo mode
     private val mockAlerts = listOf(
